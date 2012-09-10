@@ -144,4 +144,8 @@ string aliases, including C<app> to pass the request in the middleware stack:
 	    $wrapped;
 	};
 
+=head1 SEE ALSO
+
+See L<Plack::Middleware::Negotiate> to add content negotiation.
+
 =cut
