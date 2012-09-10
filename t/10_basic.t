@@ -16,7 +16,6 @@ my $backend = RESTApp->new;
 
 my $app = builder {
 	enable 'REST',
-		head   => 'get',
 		get    => sub { $backend->get(@_) },
 		create => sub { $backend->create(@_) },
 		upsert => sub { $backend->update(@_) },
