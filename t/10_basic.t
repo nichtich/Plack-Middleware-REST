@@ -19,16 +19,17 @@ my $app = builder {
 		get    => sub { $backend->get(@_) },
 		create => sub { $backend->create(@_) },
 		upsert => sub { $backend->update(@_) },
-		delete => sub { $backend->delete(@_) };
+		delete => sub { $backend->delete(@_) },
+        list   => sub { $backend->list(@_) };
 	sub { [501,[],[status_message(501)]] };
 };
 
 test_psgi $app, sub {
 	my $cb  = shift;
 
-	my $res = $cb->(GET '/');
-	is $res->code, '405', 'GET / not allowed';
-	is $res->header('Allow'), 'POST', 'use POST to create';
+	my $res = $cb->(PUT '/');
+	is $res->code, '405', 'PUT / not allowed';
+	is $res->header('Allow'), 'GET, POST', 'only GET and POST';
 
 	$res = $cb->(GET '/1');
 	is $res->code, '404', 'empty collection';
@@ -47,6 +48,10 @@ test_psgi $app, sub {
 	$res = $cb->(GET '/1');
 	is $res->content, 'world', 'modified';
 
+	$res = $cb->(POST '/', Content => 'hi', 'Content-Type' => 'text/plain');
+    $res = $cb->(GET '/');
+    is $res->content, "http://localhost/1\nhttp://localhost/2", 'list URIs';
+
 	$res = $cb->(POST '/1');
 	is $res->code, '405', 'POST on resource not allowed';
 	is $res->header('Allow'), 'DELETE, GET, PUT', 'use DELETE, GET, PUT';
@@ -56,9 +61,6 @@ test_psgi $app, sub {
 
 	$res = $cb->(GET '/1');
 	is $res->code, '404', 'resource gone';
-
-	use Data::Dumper;
-	print Dumper($res);
 };
 
 done_testing;

@@ -5,31 +5,41 @@ use warnings;
 use Plack::Request;
 use HTTP::Status qw(status_message);
 
+sub new { 
+	bless { hash => {}, count => 0 }, shift; 
+}
+
+## helper methods
+
+sub id {
+    substr($_[0]->{PATH_INFO} || '/',1);
+}
+
 sub response {
 	my $code = shift;
 	my $body = @_ ? shift : status_message($code); 
 	[ $code, [ 'Content-Type' => 'text/plain', @_ ], [ $body ] ];
 }
 
-sub new { 
-	bless { hash => {}, count => 0 }, shift; 
-}
-
-sub id {
-	my ($self,$env) = @_;
-    substr($env->{PATH_INFO} || '/',1);
+sub uri {
+    my $env = shift;
+    my $id  = @_ ? shift : id($env);
+	my $uri = Plack::Request->new($env)->base;
+	$uri .= '/' unless $uri =~ qr{/$}; # needed if mounted (?)
+	return $uri . $id;
 }
 
 sub content {
-	my ($self,$env) = @_;
-	defined $env->{CONTENT_LENGTH}
-		? Plack::Request->new($env)->content
+	defined $_[0]->{CONTENT_LENGTH}
+		? Plack::Request->new($_[0])->content
 		: undef;
 }
 
+## methods
+
 sub resource {
 	my ($self,$env) = @_;
-	$self->{hash}->{ $self->id($env) };
+	$self->{hash}->{ id($env) };
 }
 
 sub get {
@@ -40,17 +50,13 @@ sub get {
 
 sub create {
 	my ($self,$env) = @_;
-	my $resource = $self->content($env);
+	my $resource = content($env);
 	return response(400) unless defined $resource;
 
 	my $id = ++$self->{count};
 	$self->{hash}->{ $id } = $resource;
 
-	my $uri = Plack::Request->new($env)->base;
-	$uri .= '/' unless $uri =~ qr{/$}; # needed if mounted (?)
-	$uri .= $id;
-
-	my $location = "..."; # TODO
+    my $uri = uri($env,$id);
 	return response(201, $resource, Location => $uri); # or 204
 }
 
@@ -59,17 +65,23 @@ sub update {
 	
 	return response(404) unless defined $self->resource($env);
 
-	my $resource = $self->content($env);
+	my $resource = content($env);
 	return response(400) unless defined $resource;
 
-	$self->{hash}->{ $self->id($env) } = $resource;
+	$self->{hash}->{ id($env) } = $resource;
 	return response(200,$resource); # or 204
 }
 
 sub delete {
 	my ($self,$env) = @_;
-	return (defined (delete $self->{hash}->{ $self->id($env) })) 
+	return (defined (delete $self->{hash}->{ id($env) })) 
 		? response(204,'') : response(404);
+}
+
+sub list {
+	my ($self,$env) = @_;
+    my @uris = map { uri($env,$_) } keys %{$self->{hash}}; 
+    response(200, join "\n", @uris);
 }
 
 1;
