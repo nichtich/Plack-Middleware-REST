@@ -148,6 +148,8 @@ string aliases, including C<app> to pass the request in the middleware stack:
 
 =head1 SEE ALSO
 
-See L<Plack::Middleware::Negotiate> to add content negotiation.
+L<Plack::Middleware::REST::Util> provides some utility methods to implement
+RESTful PSGI applications with Plack::Middleware::REST.  See
+L<Plack::Middleware::Negotiate> for content negotiation.
 
 =cut
