@@ -63,7 +63,7 @@ sub delete {
 
 sub list {
     my ($self,$env) = @_;
-    my @uris = map { request_uri($env,$_) } keys %{$self->{hash}}; 
+    my @uris = map { request_uri($env,$_) } sort keys %{$self->{hash}}; 
     response(200, join "\n", @uris);
 }
 
