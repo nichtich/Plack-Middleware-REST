@@ -3,6 +3,8 @@ package Plack::Middleware::REST;
 use strict;
 use warnings;
 
+our $VERSION = '0.03';
+
 use Carp qw(croak);
 use Scalar::Util qw(reftype);
 
@@ -145,6 +147,13 @@ string aliases, including C<app> to pass the request in the middleware stack:
             pass_through => 0;       # respond other requests with 405
         $wrapped;
     };
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2014- Jakob Voß
+
+This library is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
 
 =head1 SEE ALSO
 

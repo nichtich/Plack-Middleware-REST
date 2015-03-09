@@ -1,6 +1,8 @@
 package Plack::Middleware::REST::Util;
 #ABSTRACT: Utility methods to create RESTful PSGI applications
 
+our $VERSION = '0.03';
+
 use Plack::Request;
 
 use parent 'Exporter';
