@@ -1,5 +1,4 @@
 package Plack::Middleware::REST;
-#ABSTRACT: Route PSGI requests for RESTful web applications
 use strict;
 use warnings;
 
@@ -67,17 +66,33 @@ sub call {
 }
 
 1;
+__END__
 
 =encoding utf8
 
+=head1 NAME
+
+Plack::Middleware::REST - Route PSGI requests for RESTful web applications
+
+=begin markdown
+
+# STATUS
+
+[![Build Status](https://travis-ci.org/nichtich/Plack-Middleware-REST.png)](https://travis-ci.org/nichtich/Plack-Middleware-REST)
+[![Coverage Status](https://coveralls.io/repos/nichtich/Plack-Middleware-REST/badge.png)](https://coveralls.io/r/nichtich/Plack-Middleware-REST)
+[![Kwalitee Score](http://cpants.cpanauthors.org/dist/Plack-Middleware-REST.png)](http://cpants.cpanauthors.org/dist/Plack-Middleware-REST)
+
+=end markdown
+
 =head1 SYNOPSIS
 
-    # $get, $create, $update, $list, $app must be PSGI applications
+    # $get, $update, $delete, $create, $list, $app must be PSGI applications
     builder {
         enable 'REST',
             get          => $get,      # HTTP GET on a resource
-            create       => $create,   # HTTP POST in '/'
             upsert       => $update,   # HTTP PUT on a resource
+            delete       => $delete,   # HTTP DELETE on a resource
+            create       => $create,   # HTTP POST in '/'
             list         => $list,     # HTTP GET on '/'
             pass_through => 1;         # pass if no defined REST request
         $app;
@@ -154,6 +169,10 @@ Copyright 2014- Jakob Voß
 
 This library is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
+
+=head1 CONTRIBUTORS
+
+Jakob Voß and Chris Kirke
 
 =head1 SEE ALSO
 

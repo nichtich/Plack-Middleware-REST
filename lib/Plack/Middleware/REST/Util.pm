@@ -1,5 +1,4 @@
 package Plack::Middleware::REST::Util;
-#ABSTRACT: Utility methods to create RESTful PSGI applications
 
 our $VERSION = '0.03';
 
@@ -27,6 +26,11 @@ sub request_uri {
 }
 
 1;
+__END__
+
+=head1 NAME
+
+Plack::Middleware::REST::Util - Utility methods to create RESTful PSGI applications
 
 =head1 SYNOPSIS
 
