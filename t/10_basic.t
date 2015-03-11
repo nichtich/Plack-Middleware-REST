@@ -29,7 +29,7 @@ test_psgi $app, sub {
 
 	my $res = $cb->(PUT '/');
 	is $res->code, '405', 'PUT / not allowed';
-	is $res->header('Allow'), 'GET, POST', 'only GET and POST';
+	is $res->header('Allow'), 'GET, HEAD, POST', 'only GET, HEAD, POST';
 
 	$res = $cb->(GET '/1');
 	is $res->code, '404', 'empty collection';
@@ -39,8 +39,12 @@ test_psgi $app, sub {
 	is $res->header('Location'), 'http://localhost/1', 'with new URI';
 
 	$res = $cb->(GET '/1');
-	is $res->code, '200', 'found';
+	is $res->code, '200', 'found (GET)';
 	is $res->content, 'hello', 'got back';
+
+	$res = $cb->(HEAD '/1');
+	is $res->code, '200', 'found (HEAD)';
+	is $res->content, '', 'no content';
 
 	$res = $cb->(PUT '/1', Content => 'world', 'Content-Type' => 'text/plain');
 	is $res->code, 200, 'updated';
@@ -50,17 +54,51 @@ test_psgi $app, sub {
 
 	$res = $cb->(POST '/', Content => 'hi', 'Content-Type' => 'text/plain');
     $res = $cb->(GET '/');
-    is $res->content, "http://localhost/1\nhttp://localhost/2", 'list URIs';
+    is $res->content, "http://localhost/1\nhttp://localhost/2", 'list URIs';    
 
 	$res = $cb->(POST '/1');
 	is $res->code, '405', 'POST on resource not allowed';
-	is $res->header('Allow'), 'DELETE, GET, PUT', 'use DELETE, GET, PUT';
+	is $res->header('Allow'), 'DELETE, GET, HEAD, PUT', 'use DELETE, GET, PUT';
 
 	$res = $cb->(DELETE '/1');
 	is $res->code, '204', 'deleted resource';
 
 	$res = $cb->(GET '/1');
-	is $res->code, '404', 'resource gone';
+	is $res->code, '404', 'resource gone (GET)';
+
+	$res = $cb->(HEAD '/1');
+	is $res->code, '404', 'resource gone (HEAD)';
 };
+
+{
+    my $app = builder {
+        enable 'REST',
+            get => sub { $backend->get(@_) },
+            head => 0;
+        sub { };
+    };
+    test_psgi $app, sub {
+        my $cb  = shift;
+        my $res = $cb->(HEAD '/{id}');
+        is $res->code, '405', 'HEAD disabled';
+        is $res->header('Allow'), 'GET', 'only GET';
+    };
+}
+
+{
+    my $app = builder {
+        enable 'REST',
+            get => sub { [200,[],['test']] },
+            head => 'auto';
+        sub { };
+    };
+    test_psgi $app, sub {
+        my $cb  = shift;
+        my $res = $cb->(GET '/{id}');
+        is $res->content, 'test';
+        $res = $cb->(HEAD '/{id}');
+        is $res->content, '', 'auto HEAD';
+    };
+}
 
 done_testing;

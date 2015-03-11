@@ -8,28 +8,34 @@ use Carp qw(croak);
 use Scalar::Util qw(reftype);
 
 use parent 'Plack::Middleware';
-use Plack::Util::Accessor qw(get create upsert delete list pass_through);
+use Plack::Util::Accessor qw(get create upsert delete list head pass_through routes);
 
-our %METHOD = (
-    resource   => {
-        GET    => 'get',
-        PUT    => 'upsert',
-        DELETE => 'delete',
-    },
-    collection => {
-        GET       => 'list',
-        POST   => 'create',
-    },
-);
+use Plack::Middleware::Head;
 
 sub prepare_app {
     my ($self) = @_;
 
-    $self->pass_through(0)
-        unless defined $self->pass_through;
+    $self->pass_through(0) unless defined $self->pass_through;
+    $self->head(1) unless defined $self->head;
 
-    my @actions = qw(get create upsert delete list);
-    foreach my $action (@actions)  {
+    $self->routes({
+        resource   => {
+            GET    => 'get',
+            PUT    => 'upsert',
+            DELETE => 'delete',
+        },
+        collection => {
+            GET    => 'list',
+            POST   => 'create',
+        },
+    });
+
+    if ($self->head) {
+        $self->routes->{resource}->{HEAD} = 'get';
+        $self->routes->{collection}->{HEAD} = 'list';
+    }
+
+    foreach my $action (qw(get create upsert delete list))  {
         my $app = $self->{$action};
 
         # alias
@@ -39,29 +45,30 @@ sub prepare_app {
             if $self->{action} and (reftype($self->{$action}) || '') ne 'CODE';
     }
 
-    while (my ($type,$method) = each %METHOD) {
-        my @allow = sort grep { $self->{ $method->{$_} } } keys %$method;
-        $self->{allow}->{$type} = \@allow;
+    while (my ($type, $route) = each %{$self->routes}) {
+        $self->{allow}->{$type} = join ', ', 
+            sort grep { $self->{ $route->{$_} } } keys %$route;
+        foreach my $method (keys %$route) {
+            $route->{$method} = $self->{ $route->{$method} };
+        }
+        if ($self->head eq 'auto') {
+            $route->{HEAD} = Plack::Middleware::Head->wrap($route->{HEAD});
+        }
     }
 }
 
 sub call {
     my ($self, $env) = @_;
 
-    my $type   = ($env->{PATH_INFO} || '/') eq '/'
-        ? 'collection' : 'resource';
-
-    my $method = $METHOD{ $type }->{ $env->{REQUEST_METHOD} };
-
-    my $app = $method ? $self->{ $method } : undef;
-
+    my $type   = ($env->{PATH_INFO} || '/') eq '/' ? 'collection' : 'resource';
+    my $method = $env->{REQUEST_METHOD};
+    my $app    = $self->routes->{$type}->{$method};
     $app ||= $self->{app} if $self->pass_through;
 
     if ( $app ) {
         $app->($env);
     } else {
-        my $allow = join ', ', @{ $self->{allow}->{$type} };
-        [ 405, [ Allow => $allow ], ['Method Not Allowed'] ];
+        [ 405, [ Allow => $self->{allow}->{$type} ], ['Method Not Allowed'] ];
     }
 }
 
@@ -140,7 +147,7 @@ Calls the PSGI application C<list> to get a list of existing resources.
 
 =back
 
-Additional HTTP request types C<HEAD>, C<OPTIONS>, and C<PATCH> may be added in
+Additional HTTP request types C<OPTIONS>, and C<PATCH> may be added in
 a later version of this module.
 
 Other requests result either result in a PSGI response with error code 405 and
@@ -149,6 +156,16 @@ passed to the underlying application in the middleware stack, if option
 C<pass_through> is set.
 
 =head1 CONFIGURATION
+
+=head2 get
+
+=head2 create
+
+=head2 upsert
+
+=head2 delete
+
+=head2 list
 
 The options C<get>, C<create>, C<upsert>, C<delete>, C<list> can be set to PSGI
 applications to enable the corresponding REST request type. One can also use
@@ -162,6 +179,18 @@ string aliases, including C<app> to pass the request in the middleware stack:
             pass_through => 0;       # respond other requests with 405
         $wrapped;
     };
+
+=head2 head
+
+By default (C<<head => 1>>) the app configured to C<get> and/or C<list> resources
+are also assumed to handle HEAD requests. Setting this configuration to C<0> will
+disallow HEAD requests. The special value C<auto> will rewrite HEAD requests with
+L<Plack::Middleware::Head>.
+
+=head2 pass_through
+
+Respond to not allowed requests with HTTP 405. Enabled by default, but this may
+change in a future version of this module!
 
 =head1 COPYRIGHT AND LICENSE
 

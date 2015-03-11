@@ -28,7 +28,8 @@ sub resource {
 sub get {
     my ($self,$env) = @_;
     my $resource = $self->resource($env);
-    return defined $resource ? response( 200 => $resource ) : response(404);
+    return response(404) unless defined $resource;
+    return response( 200 => ($env->{REQUEST_METHOD} eq 'GET' ? $resource : ''));
 }
 
 sub create {
@@ -64,6 +65,7 @@ sub delete {
 sub list {
     my ($self,$env) = @_;
     my @uris = map { request_uri($env,$_) } sort keys %{$self->{hash}}; 
+    return response( 200 => '' ) if $env->{REQUEST_METHOD} eq 'HEAD';
     response(200, join "\n", @uris);
 }
 
