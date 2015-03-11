@@ -96,12 +96,13 @@ Plack::Middleware::REST - Route PSGI requests for RESTful web applications
     # $get, $update, $delete, $create, $list, $app must be PSGI applications
     builder {
         enable 'REST',
-            get          => $get,      # HTTP GET on a resource
-            upsert       => $update,   # HTTP PUT on a resource
-            delete       => $delete,   # HTTP DELETE on a resource
-            create       => $create,   # HTTP POST in '/'
-            list         => $list,     # HTTP GET on '/'
-            pass_through => 1;         # pass if no defined REST request
+            get          => $get,      # GET /{id}
+            upsert       => $update,   # PUT /{id}
+            delete       => $delete,   # DELETE /{id}
+            create       => $create,   # POST /
+            list         => $list,     # GET /
+            head         => 1,         # HEAD /{$id} => $get, HEAD / => $list
+            pass_through => 1;         # pass everything else to $app
         $app;
     };
 
@@ -205,8 +206,34 @@ Jakob Voß and Chris Kirke
 
 =head1 SEE ALSO
 
-L<Plack::Middleware::REST::Util> provides some utility methods to implement
-RESTful PSGI applications with Plack::Middleware::REST.  See
-L<Plack::Middleware::Negotiate> for content negotiation.
+=over
+
+=item
+
+L<Plack::Middleware::REST::Util>, included with Plack::Middleware::REST
+provides some utility methods to implement RESTful PSGI applications.
+
+=item
+
+See L<Plack::Middleware::Negotiate> for content negotiation.
+
+=item
+
+Alternative CPAN modules with similar scope include L<Apache2::REST>,
+L<REST::Utils>, L<REST::Application>, L<WWW::REST::Apid>, L<WWW::REST::Simple>,
+L<CGI::Application::Plugin::REST>, and L<Plack::Middleware::RestAPI>.  Moreover
+there are general web application frameworks like L<Dancer>/L<Dancer2>,
+L<Mojolicious>, and L<Catalyst>. Maybe the number of such modules and
+frameworks is higher than the number of actual web APIs written in Perl. Who
+knows?
+
+=item
+
+REST client modules at CPAN include L<REST::Client>, L<Eixo::Rest>,
+L<REST::Consumer>, L<Net::Rest::Generic>, L<LWP::Simple::REST>, and
+L<WWW:.REST>, L<Role::REST::Client>, L<Rest::Client::Builder>,
+L<MooseX::Role::REST::Consumer>. Don't ask why.
+
+=back
 
 =cut
