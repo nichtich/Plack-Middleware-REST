@@ -35,7 +35,7 @@ test_psgi $app, sub {
 	is $res->code, '404', 'empty collection';
 
 	$res = $cb->(POST '/', Content => 'hello', 'Content-Type' => 'text/plain');
-	is $res->code, 201, 'created';
+	is $res->code, '201', 'created';
 	is $res->header('Location'), 'http://localhost/1', 'with new URI';
 
 	$res = $cb->(GET '/1');
@@ -47,14 +47,17 @@ test_psgi $app, sub {
 	is $res->content, '', 'no content';
 
 	$res = $cb->(PUT '/1', Content => 'world', 'Content-Type' => 'text/plain');
-	is $res->code, 200, 'updated';
+	is $res->code, '200', 'updated';
 
 	$res = $cb->(GET '/1');
 	is $res->content, 'world', 'modified';
 
 	$res = $cb->(POST '/', Content => 'hi', 'Content-Type' => 'text/plain');
-    $res = $cb->(GET '/');
-    is $res->content, "http://localhost/1\nhttp://localhost/2", 'list URIs';    
+        is $res->code, '201', 'created';
+	is $res->header('Location'), 'http://localhost/2', 'with new URI';
+
+        $res = $cb->(GET '/');
+        is $res->content, "http://localhost/1\nhttp://localhost/2", 'list URIs';
 
 	$res = $cb->(POST '/1');
 	is $res->code, '405', 'POST on resource not allowed';
@@ -68,6 +71,7 @@ test_psgi $app, sub {
 
 	$res = $cb->(HEAD '/1');
 	is $res->code, '404', 'resource gone (HEAD)';
+
 };
 
 {
