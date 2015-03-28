@@ -9,6 +9,15 @@ use Plack::Middleware::REST;
 use HTTP::Request::Common qw(GET PUT POST DELETE HEAD);
 use HTTP::Status qw(status_message);
 
+# simple OPTIONS request not provided by HTTP::Request::Common
+sub OPTIONS {
+
+    my ($url) = @_;
+
+    return HTTP::Request->new( 'OPTIONS' => $url );
+
+}
+
 use lib 't/lib';
 use RESTApp;
 
@@ -31,6 +40,14 @@ test_psgi $app, sub {
 	is $res->code, '405', 'PUT / not allowed';
 	is $res->header('Allow'), 'GET, HEAD, POST', 'only GET, HEAD, POST';
 
+        $res = $cb->(OPTIONS '*');
+	is $res->code, '200', 'found (OPTIONS)';
+        is $res->header('Allow'), 'DELETE, GET, HEAD, PUT', 'only DELETE, GET, HEAD, PUT';
+
+        $res = $cb->(OPTIONS '/');
+	is $res->code, '200', 'found (OPTIONS)';
+        is $res->header('Allow'), 'GET, HEAD, POST', 'only GET, HEAD, POST';
+
 	$res = $cb->(GET '/1');
 	is $res->code, '404', 'empty collection';
 
@@ -51,6 +68,10 @@ test_psgi $app, sub {
 
 	$res = $cb->(GET '/1');
 	is $res->content, 'world', 'modified';
+
+        $res = $cb->(OPTIONS '/1');
+	is $res->code, '200', 'found (OPTIONS)';
+        is $res->header('Allow'), 'DELETE, GET, HEAD, PUT', 'only DELETE, GET, HEAD, PUT';
 
 	$res = $cb->(POST '/', Content => 'hi', 'Content-Type' => 'text/plain');
     $res = $cb->(GET '/');
@@ -74,13 +95,17 @@ test_psgi $app, sub {
     my $app = builder {
         enable 'REST',
             get => sub { $backend->get(@_) },
-            head => 0;
+            head => 0,
+            options => 0;
         sub { };
     };
     test_psgi $app, sub {
         my $cb  = shift;
         my $res = $cb->(HEAD '/{id}');
         is $res->code, '405', 'HEAD disabled';
+        is $res->header('Allow'), 'GET', 'only GET';
+        $res = $cb->(OPTIONS '/{id}');
+        is $res->code, '405', 'OPTIONS disabled';
         is $res->header('Allow'), 'GET', 'only GET';
     };
 }
