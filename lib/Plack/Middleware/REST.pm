@@ -36,6 +36,11 @@ sub prepare_app {
         $self->routes->{collection}->{HEAD} = 'list';
     }
 
+    if ($self->options) {
+        $self->routes->{resource}->{OPTIONS} = 'get';
+        $self->routes->{collection}->{OPTIONS} = 'list';
+    }
+
     foreach my $action (qw(get create upsert delete list))  {
         my $app = $self->{$action};
 
@@ -68,7 +73,7 @@ sub call {
         if ($self->options) {
             [ 200, [ Allow => $self->{allow}->{$type} ], [] ];
         } else {
-            [ 405, [ Allow => $self->{allow}->{$type} ], ['Method Not Allowed'] ];
+            [ 405, [ Allow => $self->{allow}->{$type} ? $self->{allow}->{$type} : 'GET' ], ['Method Not Allowed'] ];
         }
     } else {
         my $app    = $self->routes->{$type}->{$method};

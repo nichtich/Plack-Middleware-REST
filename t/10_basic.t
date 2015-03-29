@@ -38,15 +38,15 @@ test_psgi $app, sub {
 
 	my $res = $cb->(PUT '/');
 	is $res->code, '405', 'PUT / not allowed';
-	is $res->header('Allow'), 'GET, HEAD, POST', 'only GET, HEAD, POST';
+	is $res->header('Allow'), 'GET, HEAD, OPTIONS, POST', 'only GET, HEAD, OPTIONS, POST';
 
         $res = $cb->(OPTIONS '*');
 	is $res->code, '200', 'found (OPTIONS)';
-        is $res->header('Allow'), 'DELETE, GET, HEAD, PUT', 'only DELETE, GET, HEAD, PUT';
+        is $res->header('Allow'), 'DELETE, GET, HEAD, OPTIONS, PUT', 'only DELETE, GET, HEAD, OPTIONS, PUT';
 
         $res = $cb->(OPTIONS '/');
 	is $res->code, '200', 'found (OPTIONS)';
-        is $res->header('Allow'), 'GET, HEAD, POST', 'only GET, HEAD, POST';
+        is $res->header('Allow'), 'GET, HEAD, OPTIONS, POST', 'only GET, HEAD, OPTIONS, POST';
 
 	$res = $cb->(GET '/1');
 	is $res->code, '404', 'empty collection';
@@ -71,7 +71,7 @@ test_psgi $app, sub {
 
         $res = $cb->(OPTIONS '/1');
 	is $res->code, '200', 'found (OPTIONS)';
-        is $res->header('Allow'), 'DELETE, GET, HEAD, PUT', 'only DELETE, GET, HEAD, PUT';
+        is $res->header('Allow'), 'DELETE, GET, HEAD, OPTIONS, PUT', 'only DELETE, GET, HEAD, OPTIONS, PUT';
 
 	$res = $cb->(POST '/', Content => 'hi', 'Content-Type' => 'text/plain');
     $res = $cb->(GET '/');
@@ -79,7 +79,7 @@ test_psgi $app, sub {
 
 	$res = $cb->(POST '/1');
 	is $res->code, '405', 'POST on resource not allowed';
-	is $res->header('Allow'), 'DELETE, GET, HEAD, PUT', 'use DELETE, GET, PUT';
+	is $res->header('Allow'), 'DELETE, GET, HEAD, OPTIONS, PUT', 'use DELETE, GET, OPTIONS, PUT';
 
 	$res = $cb->(DELETE '/1');
 	is $res->code, '204', 'deleted resource';
@@ -105,6 +105,9 @@ test_psgi $app, sub {
         is $res->code, '405', 'HEAD disabled';
         is $res->header('Allow'), 'GET', 'only GET';
         $res = $cb->(OPTIONS '/{id}');
+        is $res->code, '405', 'OPTIONS disabled';
+        is $res->header('Allow'), 'GET', 'only GET';
+        $res = $cb->(OPTIONS '/');
         is $res->code, '405', 'OPTIONS disabled';
         is $res->header('Allow'), 'GET', 'only GET';
     };
