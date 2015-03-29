@@ -8,7 +8,7 @@ use Carp qw(croak);
 use Scalar::Util qw(reftype);
 
 use parent 'Plack::Middleware';
-use Plack::Util::Accessor qw(get create upsert delete list head pass_through routes);
+use Plack::Util::Accessor qw(get create upsert delete list head pass_through routes options);
 
 use Plack::Middleware::Head;
 
@@ -17,6 +17,7 @@ sub prepare_app {
 
     $self->pass_through(0) unless defined $self->pass_through;
     $self->head(1) unless defined $self->head;
+    $self->options(1) unless defined $self->options;
 
     $self->routes({
         resource   => {
@@ -46,7 +47,7 @@ sub prepare_app {
     }
 
     while (my ($type, $route) = each %{$self->routes}) {
-        $self->{allow}->{$type} = join ', ', 
+        $self->{allow}->{$type} = join ', ',
             sort grep { $self->{ $route->{$_} } } keys %$route;
         foreach my $method (keys %$route) {
             $route->{$method} = $self->{ $route->{$method} };
@@ -62,13 +63,21 @@ sub call {
 
     my $type   = ($env->{PATH_INFO} || '/') eq '/' ? 'collection' : 'resource';
     my $method = $env->{REQUEST_METHOD};
-    my $app    = $self->routes->{$type}->{$method};
-    $app ||= $self->{app} if $self->pass_through;
 
-    if ( $app ) {
-        $app->($env);
+    if ($method eq 'OPTIONS') {
+        if ($self->options) {
+            [ 200, [ Allow => $self->{allow}->{$type} ], [] ];
+        } else {
+            [ 405, [ Allow => $self->{allow}->{$type} ], ['Method Not Allowed'] ];
+        }
     } else {
-        [ 405, [ Allow => $self->{allow}->{$type} ], ['Method Not Allowed'] ];
+        my $app    = $self->routes->{$type}->{$method};
+        $app ||= $self->{app} if $self->pass_through;
+        if ( $app ) {
+            $app->($env);
+        } else {
+            [ 405, [ Allow => $self->{allow}->{$type} ], ['Method Not Allowed'] ];
+        }
     }
 }
 
@@ -102,6 +111,7 @@ Plack::Middleware::REST - Route PSGI requests for RESTful web applications
             create       => $create,   # POST /
             list         => $list,     # GET /
             head         => 1,         # HEAD /{$id} => $get, HEAD / => $list
+            options      => 1,         # support OPTIONS requests
             pass_through => 1;         # pass everything else to $app
         $app;
     };
@@ -146,10 +156,13 @@ by C<http://example.org/item/123>.
 
 Calls the PSGI application C<list> to get a list of existing resources.
 
+=item C<OPTIONS http://example.org/item/>
+
+Calls the PSGI application to return the allowed methods for the resource.
+
 =back
 
-Additional HTTP request types C<OPTIONS>, and C<PATCH> may be added in
-a later version of this module.
+Additional HTTP request type C<PATCH> may be added in a later version of this module.
 
 Other requests result either result in a PSGI response with error code 405 and
 a list of possible request types in the C<Accept> header, or the request is
@@ -183,10 +196,15 @@ string aliases, including C<app> to pass the request in the middleware stack:
 
 =head2 head
 
-By default (C<<head => 1>>) the app configured to C<get> and/or C<list> resources
+By default (C<head =E<gt> 1>) the app configured to C<get> and/or C<list> resources
 are also assumed to handle HEAD requests. Setting this configuration to C<0> will
 disallow HEAD requests. The special value C<auto> will rewrite HEAD requests with
 L<Plack::Middleware::Head>.
+
+=head2 options
+
+By default (C<options =E<gt> 1>) the app is configured to handle OPTIONS requests
+for a resource. Setting this configuration to C<0> will dissallow OPTIONS requests.
 
 =head2 pass_through
 
