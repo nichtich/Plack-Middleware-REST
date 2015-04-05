@@ -18,6 +18,20 @@ sub OPTIONS {
 
 }
 
+# simple PATCH request not provided by HTTP::Request::Common
+sub PATCH {
+
+    my $url = shift;
+    my %args = @_;
+
+    my $req = PUT( $url, %args );
+
+    $req->method( 'PATCH' );
+
+    return $req;
+
+}
+
 use lib 't/lib';
 use RESTApp;
 
@@ -25,12 +39,14 @@ my $backend = RESTApp->new;
 
 my $app = builder {
 	enable 'REST',
-		get    => sub { $backend->get(@_) },
-		create => sub { $backend->create(@_) },
-		upsert => sub { $backend->update(@_) },
-		delete => sub { $backend->delete(@_) },
-        list   => sub { $backend->list(@_) };
-	sub { [501,[],[status_message(501)]] };
+		get         => sub { $backend->get(@_) },
+		create      => sub { $backend->create(@_) },
+		upsert      => sub { $backend->update(@_) },
+		delete      => sub { $backend->delete(@_) },
+                list        => sub { $backend->list(@_) },
+                patch       => sub { $backend->patch(@_) },
+                patch_types => [ 'text/plain' ];
+        sub { [501,[],[status_message(501)]] };
 };
 
 test_psgi $app, sub {
@@ -42,7 +58,8 @@ test_psgi $app, sub {
 
         $res = $cb->(OPTIONS '*');
 	is $res->code, '200', 'found (OPTIONS)';
-        is $res->header('Allow'), 'DELETE, GET, HEAD, PUT', 'only DELETE, GET, HEAD, PUT';
+        is $res->header('Allow'), 'DELETE, GET, HEAD, PATCH, PUT', 'only DELETE, GET, HEAD, PATCH, PUT';
+        is $res->header('Accept-Patch'), 'text/plain', 'only text/plain';
 
         $res = $cb->(OPTIONS '/');
 	is $res->code, '200', 'found (OPTIONS)';
@@ -65,13 +82,23 @@ test_psgi $app, sub {
 
 	$res = $cb->(PUT '/1', Content => 'world', 'Content-Type' => 'text/plain');
 	is $res->code, 200, 'updated';
+	
+        $res = $cb->(GET '/1');
+	is $res->content, 'world', 'modified';
+
+	$res = $cb->(PATCH '/1', Content => 'universe', 'Content-Type' => 'text/plain');
+	is $res->code, '204', 'updated';
+
+        $res = $cb->(PATCH '/1', Content => '<data>world</data>', 'Content-Type' => 'application/xml');
+	is $res->code, '415', 'unsupported patch type';
 
 	$res = $cb->(GET '/1');
-	is $res->content, 'world', 'modified';
+	is $res->content, 'universe', 'modified';
 
         $res = $cb->(OPTIONS '/1');
 	is $res->code, '200', 'found (OPTIONS)';
-        is $res->header('Allow'), 'DELETE, GET, HEAD, PUT', 'only DELETE, GET, HEAD, PUT';
+        is $res->header('Allow'), 'DELETE, GET, HEAD, PATCH, PUT', 'only DELETE, GET, HEAD, PATCH, PUT';
+        is $res->header('Accept-Patch'), 'text/plain', 'only text/plain';
 
 	$res = $cb->(POST '/', Content => 'hi', 'Content-Type' => 'text/plain');
     $res = $cb->(GET '/');
@@ -79,7 +106,7 @@ test_psgi $app, sub {
 
 	$res = $cb->(POST '/1');
 	is $res->code, '405', 'POST on resource not allowed';
-	is $res->header('Allow'), 'DELETE, GET, HEAD, PUT', 'use DELETE, GET, PUT';
+	is $res->header('Allow'), 'DELETE, GET, HEAD, PATCH, PUT', 'use DELETE, GET, PATCH, PUT';
 
 	$res = $cb->(DELETE '/1');
 	is $res->code, '204', 'deleted resource';
