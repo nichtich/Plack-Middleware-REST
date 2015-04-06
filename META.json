@@ -54,7 +54,7 @@
          "web" : "https://github.com/nichtich/Plack-Middleware-REST"
       }
    },
-   "version" : "0.03",
+   "version" : "0.10",
    "x_contributors" : [
       "Chris Kirke <chris.kirke@gmail.com>",
       "Jakob Voss <jakob@nichtich.de>",

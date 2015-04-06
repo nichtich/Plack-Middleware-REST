@@ -142,12 +142,13 @@ Jakob Voß and Chris Kirke
 # SEE ALSO
 
 - [Plack::Middleware::REST::Util](https://metacpan.org/pod/Plack::Middleware::REST::Util), included with Plack::Middleware::REST
-provides some utility methods to implement RESTful PSGI applications.
+provides some utility methods to implement RESTful PSGI applications.  The
+module may be removed in a future release.
 - See [Plack::Middleware::Negotiate](https://metacpan.org/pod/Plack::Middleware::Negotiate) for content negotiation.
 - See [Plack::Middleware::ETag](https://metacpan.org/pod/Plack::Middleware::ETag) for ETag generation.
 - Alternative CPAN modules with similar scope include [Apache2::REST](https://metacpan.org/pod/Apache2::REST),
 [REST::Utils](https://metacpan.org/pod/REST::Utils), [REST::Application](https://metacpan.org/pod/REST::Application), [WWW::REST::Apid](https://metacpan.org/pod/WWW::REST::Apid), [WWW::REST::Simple](https://metacpan.org/pod/WWW::REST::Simple),
-[CGI::Application::Plugin::REST](https://metacpan.org/pod/CGI::Application::Plugin::REST), and [Plack::Middleware::RestAPI](https://metacpan.org/pod/Plack::Middleware::RestAPI).  Moreover
+[CGI::Application::Plugin::REST](https://metacpan.org/pod/CGI::Application::Plugin::REST), and [Plack::App::REST](https://metacpan.org/pod/Plack::App::REST).  Moreover
 there are general web application frameworks like [Dancer](https://metacpan.org/pod/Dancer)/[Dancer2](https://metacpan.org/pod/Dancer2),
 [Mojolicious](https://metacpan.org/pod/Mojolicious), and [Catalyst](https://metacpan.org/pod/Catalyst). Maybe the number of such modules and
 frameworks is higher than the number of actual web APIs written in Perl. Who
