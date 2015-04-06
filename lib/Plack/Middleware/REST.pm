@@ -2,13 +2,14 @@ package Plack::Middleware::REST;
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.10';
 
 use Carp qw(croak);
 use Scalar::Util qw(reftype);
 
 use parent 'Plack::Middleware';
-use Plack::Util::Accessor qw(get create upsert delete list head pass_through routes options);
+use Plack::Util::Accessor
+    qw(get create upsert delete list head pass_through routes options patch patch_types);
 
 use Plack::Middleware::Head;
 
@@ -24,6 +25,7 @@ sub prepare_app {
             GET    => 'get',
             PUT    => 'upsert',
             DELETE => 'delete',
+            PATCH  => 'patch',
         },
         collection => {
             GET    => 'list',
@@ -35,13 +37,13 @@ sub prepare_app {
         $self->routes->{resource}->{HEAD} = 'get';
         $self->routes->{collection}->{HEAD} = 'list';
     }
-
+    
     if ($self->options) {
         $self->routes->{resource}->{OPTIONS} = 'get';
         $self->routes->{collection}->{OPTIONS} = 'list';
     }
 
-    foreach my $action (qw(get create upsert delete list))  {
+    foreach my $action (qw(get create upsert delete list patch))  {
         my $app = $self->{$action};
 
         # alias
@@ -71,15 +73,25 @@ sub call {
 
     if ($method eq 'OPTIONS') {
         if ($self->options) {
-            [ 200, [ Allow => $self->{allow}->{$type} ], [] ];
+            my %headers = ( 'Allow' => $self->{allow}->{$type} );
+            if ($self->patch() && $self->patch_types()) {
+                $headers{'Accept-Patch'} = join( ',', @{$self->patch_types()} );
+            }
+            [ 200, [ %headers ], [] ];
         } else {
-            [ 405, [ Allow => $self->{allow}->{$type} ? $self->{allow}->{$type} : 'GET' ], ['Method Not Allowed'] ];
+            [ 405, [ Allow => $self->{allow}->{$type} ?  $self->{allow}->{$type} : 'GET' ], 
+                   ['Method Not Allowed'] ];
         }
     } else {
-        my $app    = $self->routes->{$type}->{$method};
+        my $app = $self->routes->{$type}->{$method};
         $app ||= $self->{app} if $self->pass_through;
         if ( $app ) {
-            $app->($env);
+            if (($method eq 'PATCH') && ($self->patch_types())
+                    && ! grep { /^$env->{'CONTENT_TYPE'}$/msx } @{$self->patch_types()} ) {
+                [ 415, [], ['Unknown Patch Type'] ];
+            } else {
+                $app->($env);
+            }
         } else {
             [ 405, [ Allow => $self->{allow}->{$type} ], ['Method Not Allowed'] ];
         }
@@ -107,17 +119,19 @@ Plack::Middleware::REST - Route PSGI requests for RESTful web applications
 
 =head1 SYNOPSIS
 
-    # $get, $update, $delete, $create, $list, $app must be PSGI applications
+    # $get, $update, $delete, $create, $list, $patch, $app must be PSGI applications
     builder {
         enable 'REST',
-            get          => $get,      # GET /{id}
-            upsert       => $update,   # PUT /{id}
-            delete       => $delete,   # DELETE /{id}
-            create       => $create,   # POST /
-            list         => $list,     # GET /
-            head         => 1,         # HEAD /{$id} => $get, HEAD / => $list
-            options      => 1,         # support OPTIONS requests
-            pass_through => 1;         # pass everything else to $app
+            get          => $get,           # GET /{id}
+            upsert       => $update,        # PUT /{id}
+            delete       => $delete,        # DELETE /{id}
+            create       => $create,        # POST /
+            list         => $list,          # GET /
+            patch        => $patch,         # PATCH /{id}
+            head         => 1,              # HEAD /{$id} => $get, HEAD / => $list
+            options      => 1,              # support OPTIONS requests
+            pass_through => 1,              # pass everything else to $app
+            patch_types  => ['text/plain']; # optional accepted patch types
         $app;
     };
 
@@ -126,8 +140,8 @@ Plack::Middleware::REST - Route PSGI requests for RESTful web applications
 Plack::Middleware::REST routes HTTP requests (given in L<PSGI> request format)
 on the principles of Representational State Transfer (REST). In short, the
 application manages a set of resources with common base URL, each identified by
-its URL. One can retrieve, create, update, delete, and list resources based on
-HTTP request methods.
+its URL. One can retrieve, create, update, delete, list, and patch resources
+based on HTTP request methods.
 
 Let's say an instance of Plack::Middleware::REST is mounted at the base URL
 C<http://example.org/item/>. The following HTTP request types can be
@@ -161,13 +175,17 @@ by C<http://example.org/item/123>.
 
 Calls the PSGI application C<list> to get a list of existing resources.
 
+=item C<PATCH http://example.org/item/123>
+
+Calls the PSGI application C<patch> to update an existing resource
+identified by C<http://example.org/item/123>. The application may
+reject updates of resources.
+
 =item C<OPTIONS http://example.org/item/>
 
 Calls the PSGI application to return the allowed methods for the resource.
 
 =back
-
-Additional HTTP request type C<PATCH> may be added in a later version of this module.
 
 Other requests result either result in a PSGI response with error code 405 and
 a list of possible request types in the C<Accept> header, or the request is
@@ -186,9 +204,11 @@ C<pass_through> is set.
 
 =head2 list
 
-The options C<get>, C<create>, C<upsert>, C<delete>, C<list> can be set to PSGI
-applications to enable the corresponding REST request type. One can also use
-string aliases, including C<app> to pass the request in the middleware stack:
+=head2 patch
+
+The options C<get>, C<create>, C<upsert>, C<delete>, C<list>, C<patch> can be set
+to PSGI applications to enable the corresponding REST request type. One can also
+use string aliases, including C<app> to pass the request in the middleware stack:
 
     builder {
         enable 'REST',
@@ -216,6 +236,11 @@ for a resource. Setting this configuration to C<0> will dissallow OPTIONS reques
 Respond to not allowed requests with HTTP 405. Enabled by default, but this may
 change in a future version of this module!
 
+=head2 patch_types
+
+Optional array of acceptable patch document types for PATCH requests.
+Respond to unacceptable patch document types with HTTP 415.
+
 =head1 COPYRIGHT AND LICENSE
 
 Copyright 2014- Jakob Voß
@@ -234,7 +259,8 @@ Jakob Voß and Chris Kirke
 =item
 
 L<Plack::Middleware::REST::Util>, included with Plack::Middleware::REST
-provides some utility methods to implement RESTful PSGI applications.
+provides some utility methods to implement RESTful PSGI applications.  The
+module may be removed in a future release.
 
 =item
 
@@ -242,9 +268,13 @@ See L<Plack::Middleware::Negotiate> for content negotiation.
 
 =item
 
+See L<Plack::Middleware::ETag> for ETag generation.
+
+=item
+
 Alternative CPAN modules with similar scope include L<Apache2::REST>,
 L<REST::Utils>, L<REST::Application>, L<WWW::REST::Apid>, L<WWW::REST::Simple>,
-L<CGI::Application::Plugin::REST>, and L<Plack::Middleware::RestAPI>.  Moreover
+L<CGI::Application::Plugin::REST>, and L<Plack::App::REST>.  Moreover
 there are general web application frameworks like L<Dancer>/L<Dancer2>,
 L<Mojolicious>, and L<Catalyst>. Maybe the number of such modules and
 frameworks is higher than the number of actual web APIs written in Perl. Who

@@ -69,4 +69,16 @@ sub list {
     response(200, join "\n", @uris);
 }
 
+sub patch {
+    my ($self,$env) = @_;
+    
+    return response(404) unless defined $self->resource($env);
+
+    my ($resource, $type) = request_content($env);
+    return response(400) unless defined $resource;
+
+    $self->{hash}->{ request_id($env) } = $resource;
+    return response(204,$resource);
+}
+
 1;

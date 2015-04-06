@@ -9,14 +9,9 @@ use Plack::Middleware::REST;
 use HTTP::Request::Common qw(GET PUT POST DELETE HEAD);
 use HTTP::Status qw(status_message);
 
-# simple OPTIONS request not provided by HTTP::Request::Common
-sub OPTIONS {
-
-    my ($url) = @_;
-
-    return HTTP::Request->new( 'OPTIONS' => $url );
-
-}
+# simple OPTIONS and PATCH requests not provided by HTTP::Request::Common
+sub OPTIONS { HTTP::Request->new( 'OPTIONS' => @_ ) }
+sub PATCH { my $req = PUT(@_); $req->method('PATCH'); $req }
 
 use lib 't/lib';
 use RESTApp;
@@ -25,12 +20,14 @@ my $backend = RESTApp->new;
 
 my $app = builder {
 	enable 'REST',
-		get    => sub { $backend->get(@_) },
-		create => sub { $backend->create(@_) },
-		upsert => sub { $backend->update(@_) },
-		delete => sub { $backend->delete(@_) },
-        list   => sub { $backend->list(@_) };
-	sub { [501,[],[status_message(501)]] };
+		get         => sub { $backend->get(@_) },
+		create      => sub { $backend->create(@_) },
+		upsert      => sub { $backend->update(@_) },
+		delete      => sub { $backend->delete(@_) },
+        list        => sub { $backend->list(@_) },
+        patch       => sub { $backend->patch(@_) },
+        patch_types => [ 'text/plain' ];
+        sub { [501,[],[status_message(501)]] };
 };
 
 test_psgi $app, sub {
@@ -38,15 +35,17 @@ test_psgi $app, sub {
 
 	my $res = $cb->(PUT '/');
 	is $res->code, '405', 'PUT / not allowed';
-	is $res->header('Allow'), 'GET, HEAD, OPTIONS, POST', 'only GET, HEAD, OPTIONS, POST';
+	is $res->header('Allow'), 'GET, HEAD, OPTIONS, POST', 'GET, HEAD, OPTIONS, POST';
 
-        $res = $cb->(OPTIONS '*');
+    $res = $cb->(OPTIONS '*');
 	is $res->code, '200', 'found (OPTIONS)';
-        is $res->header('Allow'), 'DELETE, GET, HEAD, OPTIONS, PUT', 'only DELETE, GET, HEAD, OPTIONS, PUT';
+    is $res->header('Allow'), 'DELETE, GET, HEAD, OPTIONS, PATCH, PUT', 
+                              'DELETE, GET, HEAD, OPTIONS, PATCH, PUT';
+    is $res->header('Accept-Patch'), 'text/plain', 'only text/plain';
 
-        $res = $cb->(OPTIONS '/');
+    $res = $cb->(OPTIONS '/');
 	is $res->code, '200', 'found (OPTIONS)';
-        is $res->header('Allow'), 'GET, HEAD, OPTIONS, POST', 'only GET, HEAD, OPTIONS, POST';
+    is $res->header('Allow'), 'GET, HEAD, OPTIONS, POST', 'only GET, HEAD, OPTIONS, POST';
 
 	$res = $cb->(GET '/1');
 	is $res->code, '404', 'empty collection';
@@ -64,26 +63,38 @@ test_psgi $app, sub {
 	is $res->content, '', 'no content';
 
 	$res = $cb->(PUT '/1', Content => 'world', 'Content-Type' => 'text/plain');
-	is $res->code, '200', 'updated';
-
-	$res = $cb->(GET '/1');
+	is $res->code, 200, 'updated';
+	
+    $res = $cb->(GET '/1');
 	is $res->content, 'world', 'modified';
 
-        $res = $cb->(OPTIONS '/1');
+	$res = $cb->(PATCH '/1', Content => 'universe', 'Content-Type' => 'text/plain');
+	is $res->code, '204', 'updated';
+
+    $res = $cb->(PATCH '/1', Content => '<data>world</data>', 'Content-Type' => 'application/xml');
+	is $res->code, '415', 'unsupported patch type';
+
+	$res = $cb->(GET '/1');
+	is $res->content, 'universe', 'modified';
+
+    $res = $cb->(OPTIONS '/1');
 	is $res->code, '200', 'found (OPTIONS)';
-        is $res->header('Allow'), 'DELETE, GET, HEAD, OPTIONS, PUT', 'only DELETE, GET, HEAD, OPTIONS, PUT';
+
+    is $res->header('Allow'), 'DELETE, GET, HEAD, OPTIONS, PATCH, PUT',
+                              'DELETE, GET, HEAD, OPTIONS, PATCH, PUT';
+    is $res->header('Accept-Patch'), 'text/plain', 'only text/plain';
 
 	$res = $cb->(POST '/', Content => 'hi', 'Content-Type' => 'text/plain');
-        is $res->code, '201', 'created';
+    is $res->code, '201', 'created';
 	is $res->header('Location'), 'http://localhost/2', 'with new URI';
 
-        $res = $cb->(GET '/');
-        is $res->content, "http://localhost/1\nhttp://localhost/2", 'list URIs';
+    $res = $cb->(GET '/');
+    is $res->content, "http://localhost/1\nhttp://localhost/2", 'list URIs';
 
 	$res = $cb->(POST '/1');
 	is $res->code, '405', 'POST on resource not allowed';
-	is $res->header('Allow'), 'DELETE, GET, HEAD, OPTIONS, PUT', 'use DELETE, GET, OPTIONS, PUT';
-
+	is $res->header('Allow'), 'DELETE, GET, HEAD, OPTIONS, PATCH, PUT', 
+                              'DELETE, GET, HEAD, OPTIONS, PATCH, PUT';
 	$res = $cb->(DELETE '/1');
 	is $res->code, '204', 'deleted resource';
 

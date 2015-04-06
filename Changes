@@ -1,5 +1,4 @@
 Changelog for Plakc::Middleware::REST. See also http://github.com/nichtich/Plack-Middleware-REST/issues
 
 {{$NEXT}}
-
-  - support HEAD requests
+  - support HEAD, OPTIONS, and PATCH requests (Chris Kirke)
